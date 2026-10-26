@@ -123,3 +123,7 @@ Settings and the event log are in `%APPDATA%\MixDeck\`. With `MIXDECK_DEBUG=1` t
 | `Hotkeys.cs`, `Views/Osd.cs` | global hotkeys, on-screen popup |
 | `Updater.cs`, `Program.cs` | updates (Velopack) |
 | `ViewModels/`, `Views/`, `MainWindow.xaml` | UI (WPF, Fluent Dark theme, own palette) |
+
+## License
+
+[MIT](LICENSE) © 2026 Kacper Adamus. Third-party components keep their own licenses: NAudio (MIT), CommunityToolkit.Mvvm (MIT), QRCoder (MIT), Velopack (MIT), RNNoise (BSD-3-Clause).
