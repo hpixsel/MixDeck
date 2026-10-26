@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- MixDeck palette: graphite surfaces, teal brand, one accent colour per output -->
+    <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+    <SolidColorBrush x:Key="WindowBg" Color="#0E1014" />
+    <SolidColorBrush x:Key="SurfaceBg" Color="#161920" />
+    <SolidColorBrush x:Key="Surface2Bg" Color="#1E222B" />
+    <SolidColorBrush x:Key="HoverBg" Color="#252A35" />
+    <SolidColorBrush x:Key="TrackBg" Color="#2A2F3B" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#242935" />
+    <SolidColorBrush x:Key="TextBrush" Color="#E8EAF0" />
+    <SolidColorBrush x:Key="SubtleText" Color="#8A90A0" />
+    <SolidColorBrush x:Key="FaintText" Color="#5D6372" />
+    <SolidColorBrush x:Key="BrandBrush" Color="#2DD4BF" />
+    <SolidColorBrush x:Key="OkBrush" Color="#3DDC97" />
+    <SolidColorBrush x:Key="WarnBrush" Color="#F5B841" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#F25F5C" />
+    <SolidColorBrush x:Key="DangerTint" Color="#2BF25F5C" />
+    <SolidColorBrush x:Key="WarnTint" Color="#1FF5B841" />
+    <SolidColorBrush x:Key="BrandTint" Color="#262DD4BF" />
+</ResourceDictionary>

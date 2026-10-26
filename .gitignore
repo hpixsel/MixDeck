@@ -1,0 +1,8 @@
+bin/
+obj/
+dist/
+.vs/
+*.user
+build/publish/
+releases/
+build/logo-preview.png

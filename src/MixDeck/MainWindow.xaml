@@ -1,0 +1,363 @@
+<Window x:Class="MixDeck.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:c="clr-namespace:MixDeck.Controls"
+        xmlns:vm="clr-namespace:MixDeck.ViewModels"
+        xmlns:audio="clr-namespace:MixDeck.Audio"
+        xmlns:views="clr-namespace:MixDeck.Views"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance vm:MainViewModel}"
+        Title="MixDeck" Width="1240" Height="820" MinWidth="960" MinHeight="540"
+        Background="{StaticResource WindowBg}" Foreground="{StaticResource TextBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <!-- App chip: drag to another channel, right-click for a menu -->
+        <DataTemplate x:Key="AppChip" DataType="vm:AppViewModel">
+            <Border x:Name="Chip" Background="{StaticResource Surface2Bg}" CornerRadius="13" Padding="4,3,10,3" Margin="0,6,6,0"
+                    Cursor="Hand" ToolTip="{Binding Tooltip}"
+                    PreviewMouseLeftButtonDown="Chip_MouseDown" MouseMove="Chip_MouseMove" MouseLeftButtonUp="Chip_MouseUp" ContextMenuOpening="Chip_ContextMenuOpening">
+                <Border.ContextMenu>
+                    <ContextMenu />
+                </Border.ContextMenu>
+                <StackPanel Orientation="Horizontal">
+                    <Grid Width="18" Height="18">
+                        <Image Source="{Binding Icon}" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock x:Name="Fallback" Text="&#xE71D;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource SubtleText}" Visibility="Collapsed" />
+                    </Grid>
+                    <TextBlock Text="{Binding DisplayName}" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center" MaxWidth="150" TextTrimming="CharacterEllipsis" />
+                    <Ellipse x:Name="Live" Width="6" Height="6" Fill="{StaticResource OkBrush}" Margin="7,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                    <Setter TargetName="Fallback" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Playing}" Value="True">
+                    <Setter TargetName="Live" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource HoverBg}" />
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ===== Header: brand · health · settings ===== -->
+        <DockPanel Grid.Row="0" Margin="28,18,28,14" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <Image x:Name="Logo" Width="28" Height="28" />
+                <TextBlock Text="MixDeck" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="SemiBold"
+                           Margin="10,0,0,2" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ToggleButton x:Name="SettingsToggle" DockPanel.Dock="Right" Style="{StaticResource SurfaceButton}" Width="40" Height="36"
+                          IsChecked="{Binding SettingsOpen}" ToolTip="Settings">
+                <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFont}" FontSize="16" />
+            </ToggleButton>
+
+            <Grid DockPanel.Dock="Right" Width="170" Height="36" Margin="0,0,10,0"
+                  Visibility="{Binding Profiles.Count, Converter={x:Static vm:Converters.PositiveToVisibility}}">
+                <ComboBox VerticalContentAlignment="Center" ItemsSource="{Binding Profiles}" DisplayMemberPath="Name"
+                          SelectedItem="{Binding ActiveProfile, Mode=OneWay}" SelectionChanged="Profile_SelectionChanged"
+                          ToolTip="Profile: a saved set of volumes (Settings → Profiles)" />
+                <TextBlock Text="Profile…" Foreground="{StaticResource SubtleText}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Visibility="{Binding ActiveProfile, Converter={x:Static vm:Converters.NullToVisibility}}" />
+            </Grid>
+            <Button DockPanel.Dock="Right" Style="{StaticResource SurfaceButton}" Height="36" Padding="14,0" Margin="0,0,10,0"
+                    Click="UpdateBadge_Click" ToolTip="A new version of MixDeck is available"
+                    Visibility="{Binding UpdateAvailable, Converter={x:Static vm:Converters.BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="Update" Foreground="{StaticResource BrandBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Border DockPanel.Dock="Right" Background="{StaticResource SurfaceBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="18" Padding="14,0,6,0" Height="36" Margin="0,0,10,0">
+                <!-- health pill -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse x:Name="HealthDot" Width="8" Height="8" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource OkBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StatusLevel}" Value="{x:Static audio:StatusLevel.Warning}">
+                                        <Setter Property="Fill" Value="{StaticResource WarnBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding StatusLevel}" Value="{x:Static audio:StatusLevel.Error}">
+                                        <Setter Property="Fill" Value="{StaticResource DangerBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="{Binding StatusText}" Margin="10,0,8,0" VerticalAlignment="Center" FontSize="12.5" MaxWidth="520"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
+                    <Button Command="{Binding FixStatusCommand}" Width="Auto" Height="26">
+                        <TextBlock Text="Fix" Foreground="{StaticResource BrandBrush}" FontWeight="SemiBold" FontSize="12" Margin="10,0" />
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StatusFix}" Value="{x:Static audio:StatusFix.None}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </DockPanel>
+
+        <!-- Per-app volume: opens when an app chip is clicked (not dragged) -->
+        <Popup x:Name="AppVolumePopup" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" VerticalOffset="6">
+            <Border Background="{StaticResource Surface2Bg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10"
+                    Padding="14,10" Width="300" d:DataContext="{d:DesignInstance vm:AppViewModel}">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,6">
+                        <Image Source="{Binding Icon}" Width="18" Height="18" Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Style="{StaticResource Percent}" Text="{Binding Volume, StringFormat={}{0:0}%}" />
+                        <c:LevelSlider Value="{Binding Volume}" Accent="{StaticResource BrandBrush}" />
+                    </DockPanel>
+                    <TextBlock Text="This app's volume within its channel. Double-click the slider to reset it to 100%."
+                               Foreground="{StaticResource FaintText}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- ===== Apps that bypass the mixer ===== -->
+        <Border Grid.Row="1" Margin="28,0,28,14" Background="{StaticResource WarnTint}" CornerRadius="10" Padding="16,12">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding BypassApps.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <DockPanel>
+                <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" FontSize="18" Foreground="{StaticResource WarnBrush}"
+                           VerticalAlignment="Top" Margin="0,1,14,0" />
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SurfaceButton}" Padding="14,6" Command="{Binding RedirectBypassCommand}"
+                                ToolTip="Clears the output device Windows has set for these apps, so they play through MixDeck">
+                            <TextBlock Text="Route through MixDeck" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" FontSize="12" />
+                        </Button>
+                        <StackPanel>
+                            <TextBlock Text="These apps bypass the mixer" FontWeight="SemiBold" />
+                            <TextBlock Foreground="{StaticResource SubtleText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,12,0"
+                                       Text="They play straight to a specific device, so MixDeck can't hear them." />
+                        </StackPanel>
+                    </DockPanel>
+                    <TextBlock Foreground="{StaticResource WarnBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="If an app still bypasses the mixer, it picks a device in its own settings: set its output to “Default” there, or restart it."
+                               Visibility="{Binding RedirectTried, Converter={x:Static vm:Converters.BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding BypassApps}" ItemTemplate="{StaticResource AppChip}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== Matrix: channels (rows) × outputs (columns) ===== -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="24,0,24,24">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="52" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Bottom" Margin="8,0,8,10">
+                        <TextBlock Text="Channels" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Foreground="{StaticResource SubtleText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   Text="Drag an app onto a channel to change where it plays. The sliders set each channel's volume on each output." />
+                    </StackPanel>
+
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Mixes}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:MixViewModel">
+                                <Border Style="{StaticResource Surface}" BorderBrush="{Binding Accent}" BorderThickness="0,3,0,0" Padding="14,12,14,10">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Border Width="32" Height="32" CornerRadius="8" Background="{Binding AccentTint}" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="16" Foreground="{Binding Accent}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="Fallback devices, sound, remove" Click="MixMenu_Click">
+                                                <TextBlock Text="&#xE712;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                                            </Button>
+                                            <TextBox Style="{StaticResource InlineEdit}" Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                                                     VerticalAlignment="Center" KeyDown="InlineEdit_KeyDown" />
+                                        </DockPanel>
+                                        <ComboBox Margin="0,10,0,6" ItemsSource="{Binding DataContext.OutputDevices, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding OutputDeviceId}"
+                                                  ToolTip="The device this output plays on" />
+                                        <TextBlock Text="{Binding ActiveNote}" Foreground="{StaticResource WarnBrush}" FontSize="11.5" Margin="2,0,0,4"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveNote}"
+                                                   Visibility="{Binding ActiveNote, Converter={x:Static vm:Converters.NotEmptyToVisibility}}" />
+                                        <DockPanel>
+                                            <ToggleButton Style="{StaticResource MuteToggle}" IsChecked="{Binding Muted}" ToolTip="Mute the whole output" />
+                                            <TextBlock DockPanel.Dock="Right" Style="{StaticResource Percent}" Text="{Binding Volume, StringFormat={}{0:0}%}" />
+                                            <c:LevelSlider Margin="4,0,0,0" Value="{Binding Volume}" Level="{Binding Level}" IsMuted="{Binding Muted}"
+                                                           Accent="{Binding Accent}" ToolTip="Volume of the whole output (double-click: 100%)" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button Grid.Column="2" Style="{StaticResource SurfaceButton}" Margin="4" Command="{Binding AddMixCommand}"
+                            ToolTip="Add an output (e.g. second headphones or a virtual cable for OBS)">
+                        <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="15" />
+                    </Button>
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Channels}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:ChannelViewModel">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="340" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="52" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border x:Name="ChannelCard" Padding="12,10,8,10" MinHeight="68" AllowDrop="True"
+                                        DragEnter="Channel_DragOver" DragOver="Channel_DragOver" DragLeave="Channel_DragLeave" Drop="Channel_Drop">
+                                    <Border.Style>
+                                        <Style TargetType="Border" BasedOn="{StaticResource Surface}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource BrandTint}" />
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BrandBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <DockPanel>
+                                            <Border Width="36" Height="36" CornerRadius="9" Background="{Binding AccentTint}" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="17" Foreground="{Binding Accent}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="Effects, ducking, remove" Click="ChannelMenu_Click">
+                                                <TextBlock Text="&#xE712;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                                            </Button>
+                                            <Border DockPanel.Dock="Right" Background="{StaticResource BrandTint}" CornerRadius="9" Padding="7,1" Margin="0,0,4,0"
+                                                    VerticalAlignment="Center" ToolTip="Auto-ducking: someone is talking on another channel"
+                                                    Visibility="{Binding IsDucked, Converter={x:Static vm:Converters.BoolToVisibility}}">
+                                                <TextBlock Text="↓ ducked" Foreground="{StaticResource BrandBrush}" FontSize="11" />
+                                            </Border>
+                                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource MuteToggle}" IsChecked="{Binding Muted}"
+                                                          ToolTip="Mute this channel on all outputs" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBox Style="{StaticResource InlineEdit}" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" KeyDown="InlineEdit_KeyDown" />
+                                                <TextBlock x:Name="HintText" Text="{Binding Hint}" Foreground="{StaticResource FaintText}" FontSize="11.5"
+                                                           Margin="4,0,0,0" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="MoreText" Text="{Binding MoreText}" ToolTip="{Binding MoreTooltip}" Foreground="{StaticResource FaintText}"
+                                                           FontSize="11.5" Margin="4,0,0,0" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <ItemsControl x:Name="Chips" ItemsSource="{Binding Apps}" ItemTemplate="{StaticResource AppChip}" Margin="44,0,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Sends}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:SendViewModel">
+                                            <Border Padding="14,0">
+                                                <DockPanel VerticalAlignment="Center">
+                                                    <ToggleButton Style="{StaticResource MuteToggle}" IsChecked="{Binding Muted}" ToolTip="Mute this channel on this output" />
+                                                    <TextBlock DockPanel.Dock="Right" Style="{StaticResource Percent}" Text="{Binding Volume, StringFormat={}{0:0}%}" />
+                                                    <c:LevelSlider Margin="4,0,0,0" Value="{Binding Volume}" Level="{Binding Level}" IsMuted="{Binding Muted}"
+                                                                   Accent="{Binding Mix.Accent}" />
+                                                </DockPanel>
+                                                <Border.Style>
+                                                    <Style TargetType="Border" BasedOn="{StaticResource Surface}">
+                                                        <Style.Triggers>
+                                                            <!-- the whole row fades when the channel is muted everywhere -->
+                                                            <DataTrigger Binding="{Binding DataContext.Muted, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                                                                <Setter Property="Opacity" Value="0.4" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Apps.Count, Converter={x:Static vm:Converters.IsPositive}}" Value="True">
+                                    <Setter TargetName="HintText" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="MoreText" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Apps.Count}" Value="0">
+                                    <Setter TargetName="Chips" Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Apps.Count}" Value="0">
+                                    <Setter TargetName="MoreText" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="AddChannelButton" Style="{StaticResource SurfaceButton}" Margin="4" Height="48" Click="AddChannelButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="13" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <TextBlock Text="Add channel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <views:FxEditors Grid.RowSpan="3" />
+        <views:SettingsView Grid.RowSpan="3" Visibility="{Binding SettingsOpen, Converter={x:Static vm:Converters.BoolToVisibility}}" />
+        <views:WizardView Grid.RowSpan="3" Visibility="{Binding IsWizardOpen, Converter={x:Static vm:Converters.BoolToVisibility}}" />
+    </Grid>
+</Window>

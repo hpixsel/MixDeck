@@ -1,0 +1,174 @@
+<UserControl x:Class="MixDeck.Views.FxEditors"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:MixDeck.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:MainViewModel}"
+             Foreground="{StaticResource TextBrush}">
+    <UserControl.Resources>
+        <Style x:Key="Dialog" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="24,20" />
+            <Setter Property="Width" Value="460" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Help" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SubtleText}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="Option" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface2Bg}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="Value" TargetType="TextBlock">
+            <Setter Property="Width" Value="64" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource SubtleText}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- ===== Microphone effects ===== -->
+        <Grid Background="#B0000000" Visibility="{Binding InputFxEditor, Converter={x:Static vm:Converters.NotNullToVisibility}}"
+              MouseDown="Backdrop_MouseDown">
+            <Border Style="{StaticResource Dialog}" DataContext="{Binding InputFxEditor}" MouseDown="Dialog_MouseDown">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Click="Close_Click" ToolTip="Close">
+                            <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                        </Button>
+                        <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold">
+                            <Run Text="Microphone effects: " /><Run Text="{Binding Channel.Name, Mode=OneWay}" />
+                        </TextBlock>
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource Help}" Margin="0,0,0,12"
+                               Text="They change how this input sounds on every MixDeck output. For Discord or OBS to hear the processed microphone, add an output on a virtual cable (e.g. VB-Cable) and pick “CABLE Output” as the microphone there." />
+
+                    <!-- live level so the gate threshold can be set by eye -->
+                    <DockPanel Margin="0,0,0,12">
+                        <TextBlock Text="Level" Width="70" VerticalAlignment="Center" Foreground="{StaticResource SubtleText}" FontSize="12" />
+                        <Grid Height="6" VerticalAlignment="Center">
+                            <Border Background="{StaticResource TrackBg}" CornerRadius="3" />
+                            <Border Background="{Binding Channel.Accent}" CornerRadius="3" HorizontalAlignment="Left" x:Name="InputMeter"
+                                    Width="{Binding Channel.Level, Converter={x:Static vm:Converters.FractionToWidth}, ConverterParameter=330}" />
+                        </Grid>
+                    </DockPanel>
+
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <CheckBox Content="Noise suppression (RNNoise)" IsChecked="{Binding NoiseSuppression}" IsEnabled="{Binding NoiseSuppressionAvailable}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Help}" Margin="28,2,0,0" Text="Removes fan noise, keyboard clicks and background sound. Adds 10 ms of delay." />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <CheckBox Content="Rumble filter (below 80 Hz)" IsChecked="{Binding HighPass}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Help}" Margin="28,2,0,0" Text="Removes desk bumps, hum and wind." />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <CheckBox Content="Noise gate" IsChecked="{Binding Gate}" FontWeight="SemiBold" />
+                            <DockPanel Margin="28,6,0,0" IsEnabled="{Binding Gate}">
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Value}" Text="{Binding GateThresholdDb, StringFormat={}{0:0} dB}" />
+                                <TextBlock Text="Threshold" Width="60" VerticalAlignment="Center" FontSize="12" />
+                                <Slider Minimum="-70" Maximum="-20" Value="{Binding GateThresholdDb}" SmallChange="1" LargeChange="5"
+                                        ToolTip="Sound quieter than the threshold is silenced. Set it just above your room's silence level." />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <CheckBox Content="Compressor" IsChecked="{Binding Compressor}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Help}" Margin="28,2,0,0" Text="Evens out loudness: quiet words get clearer, shouting doesn't distort." />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Option}">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Style="{StaticResource Value}" Text="{Binding GainDb, StringFormat={}{0:+0;-0;0} dB}" />
+                            <TextBlock Text="Gain" Width="104" VerticalAlignment="Center" FontWeight="SemiBold" />
+                            <Slider Minimum="-12" Maximum="24" Value="{Binding GainDb}" SmallChange="1" LargeChange="3" />
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== Output EQ / limiter ===== -->
+        <Grid Background="#B0000000" Visibility="{Binding OutputFxEditor, Converter={x:Static vm:Converters.NotNullToVisibility}}"
+              MouseDown="Backdrop_MouseDown">
+            <Border Style="{StaticResource Dialog}" DataContext="{Binding OutputFxEditor}" MouseDown="Dialog_MouseDown">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Click="Close_Click" ToolTip="Close">
+                            <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                        </Button>
+                        <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold">
+                            <Run Text="Sound: " /><Run Text="{Binding Mix.Name, Mode=OneWay}" />
+                        </TextBlock>
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource Help}" Margin="0,0,0,12" Text="Applies to everything playing on this output." />
+
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Padding="10,3" FontSize="12" />
+                                <TextBlock Text="Equalizer" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <DockPanel Margin="0,8,0,0">
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Value}" Text="{Binding Bass, StringFormat={}{0:+0.0;-0.0;0} dB}" />
+                                <TextBlock Text="Bass" Width="60" VerticalAlignment="Center" />
+                                <Slider Minimum="-12" Maximum="12" Value="{Binding Bass}" SmallChange="0.5" LargeChange="2" TickFrequency="0.5" IsSnapToTickEnabled="True" />
+                            </DockPanel>
+                            <DockPanel Margin="0,4,0,0">
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Value}" Text="{Binding Mid, StringFormat={}{0:+0.0;-0.0;0} dB}" />
+                                <TextBlock Text="Mid" Width="60" VerticalAlignment="Center" />
+                                <Slider Minimum="-12" Maximum="12" Value="{Binding Mid}" SmallChange="0.5" LargeChange="2" TickFrequency="0.5" IsSnapToTickEnabled="True" />
+                            </DockPanel>
+                            <DockPanel Margin="0,4,0,0">
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Value}" Text="{Binding Treble, StringFormat={}{0:+0.0;-0.0;0} dB}" />
+                                <TextBlock Text="Treble" Width="60" VerticalAlignment="Center" />
+                                <Slider Minimum="-12" Maximum="12" Value="{Binding Treble}" SmallChange="0.5" LargeChange="2" TickFrequency="0.5" IsSnapToTickEnabled="True" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <TextBlock Text="Headphone correction (AutoEQ)" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Help}" Margin="0,2,0,8">
+                                <Run Text="Flattens the frequency response of your headphone model. Download the “ParametricEQ.txt” file for your model from" />
+                                <Hyperlink NavigateUri="https://github.com/jaakkopasanen/AutoEq" RequestNavigate="Link_RequestNavigate" Foreground="{StaticResource BrandBrush}">AutoEq</Hyperlink><Run Text="." />
+                            </TextBlock>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Remove" Command="{Binding ClearProfileCommand}" Margin="6,0,0,0"
+                                        Visibility="{Binding ProfileName, Converter={x:Static vm:Converters.NotEmptyToVisibility}}" />
+                                <Button DockPanel.Dock="Right" Content="Load file…" Command="{Binding LoadProfileCommand}" />
+                                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding ProfileName, TargetNullValue=No profile}" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Option}">
+                        <StackPanel>
+                            <CheckBox Content="Hearing protection (limiter)" IsChecked="{Binding Limiter}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Help}" Margin="28,2,0,0"
+                                       Text="Sudden very loud sounds are turned down instead of distorting. Recommended, especially for headphones." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

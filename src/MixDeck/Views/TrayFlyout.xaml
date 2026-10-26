@@ -1,0 +1,94 @@
+<Window x:Class="MixDeck.Views.TrayFlyout"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:c="clr-namespace:MixDeck.Controls"
+        xmlns:vm="clr-namespace:MixDeck.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance vm:MainViewModel}"
+        Title="MixDeck" Width="380" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        ShowInTaskbar="False" Topmost="True" Foreground="{StaticResource TextBrush}">
+
+    <Border Background="{StaticResource SurfaceBg}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+        <StackPanel>
+            <!-- header -->
+            <DockPanel Margin="0,0,0,10">
+                <Image x:Name="Logo" Width="20" Height="20" />
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="Open the full mixer" Click="OpenMain_Click">
+                    <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                </Button>
+                <Grid DockPanel.Dock="Right" Width="140" Margin="0,0,6,0"
+                      Visibility="{Binding Profiles.Count, Converter={x:Static vm:Converters.PositiveToVisibility}}">
+                    <ComboBox ItemsSource="{Binding Profiles}" DisplayMemberPath="Name" SelectedItem="{Binding ActiveProfile, Mode=OneWay}"
+                              SelectionChanged="Profile_SelectionChanged" ToolTip="Profile" />
+                    <TextBlock Text="Profile…" Foreground="{StaticResource SubtleText}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Visibility="{Binding ActiveProfile, Converter={x:Static vm:Converters.NullToVisibility}}" />
+                </Grid>
+                <TextBlock Text="MixDeck" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold" FontSize="15" Margin="8,0,0,0" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- output picker: one output at a time keeps the flyout small -->
+            <ItemsControl ItemsSource="{Binding Mixes}" Margin="0,0,0,10">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:MixViewModel">
+                        <RadioButton GroupName="FlyoutMix" Margin="0,0,4,0" Cursor="Hand" Checked="Mix_Checked" Loaded="Mix_Loaded">
+                            <RadioButton.Template>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd" CornerRadius="8" Padding="8,6" Background="{StaticResource Surface2Bg}" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="{Binding Accent}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Name}" Margin="6,0,0,0" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{Binding Accent}" />
+                                            <Setter TargetName="Bd" Property="Background" Value="{Binding AccentTint}" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </RadioButton.Template>
+                        </RadioButton>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- selected output master -->
+            <DockPanel DataContext="{Binding FlyoutMix}" Margin="0,0,0,6">
+                <ToggleButton Style="{StaticResource MuteToggle}" IsChecked="{Binding Muted}" ToolTip="Mute the whole output" />
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Percent}" Text="{Binding Volume, StringFormat={}{0:0}%}" />
+                <TextBlock Text="Whole output" Width="96" Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5" />
+                <c:LevelSlider Value="{Binding Volume}" Level="{Binding Level}" IsMuted="{Binding Muted}" Accent="{Binding Accent}" />
+            </DockPanel>
+            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,4,0,6" />
+
+            <!-- channels on that output -->
+            <ItemsControl ItemsSource="{Binding FlyoutSends}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:SendViewModel">
+                        <DockPanel Margin="0,2">
+                            <ToggleButton Style="{StaticResource MuteToggle}" IsChecked="{Binding Muted}" ToolTip="Mute this channel on this output" />
+                            <TextBlock DockPanel.Dock="Right" Style="{StaticResource Percent}" Text="{Binding Volume, StringFormat={}{0:0}%}" />
+                            <StackPanel Orientation="Horizontal" Width="96" Margin="6,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Channel.Glyph}" FontFamily="{StaticResource IconFont}" Foreground="{Binding Channel.Accent}"
+                                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding Channel.Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <c:LevelSlider Value="{Binding Volume}" Level="{Binding Level}" IsMuted="{Binding Muted}" Accent="{Binding Mix.Accent}" />
+                        </DockPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</Window>
