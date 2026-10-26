@@ -42,7 +42,7 @@
   .slider .track, .slider .fill, .slider .meter { position: absolute; left: 10px; top: 19px; height: 6px; border-radius: 3px; }
   .slider .track { right: 10px; background: var(--track); }
   .slider .fill { width: calc((100% - 20px) * var(--v) / 100); background: var(--accent); opacity: .28; }
-  .slider .meter { width: calc((100% - 20px) * var(--m)); background: var(--accent); transition: width 60ms linear; }
+  .slider .meter { width: calc((100% - 20px) * min(var(--m), var(--v) / 100)); background: var(--accent); transition: width 60ms linear; }
   .slider .thumb { position: absolute; top: 12px; left: calc(10px + (100% - 20px) * var(--v) / 100); width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--surface); }
   .muted .slider { opacity: .4; }
 

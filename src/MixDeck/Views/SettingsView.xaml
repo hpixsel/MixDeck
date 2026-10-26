@@ -126,7 +126,7 @@
                                                 <TextBox Style="{StaticResource InlineEdit}" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center" />
                                             </DockPanel>
                                             <DockPanel Margin="0,6,0,0">
-                                                <TextBlock Text="Switch on while running:" Foreground="{StaticResource SubtleText}" FontSize="12" VerticalAlignment="Center" Width="130" />
+                                                <TextBlock Text="Switch on while running:" Foreground="{StaticResource SubtleText}" FontSize="12" VerticalAlignment="Center" Width="160" />
                                                 <TextBox Text="{Binding TriggerApps, UpdateSourceTrigger=LostFocus}" FontSize="12"
                                                          ToolTip="Comma-separated .exe names, e.g. cs2.exe, valorant.exe" />
                                             </DockPanel>

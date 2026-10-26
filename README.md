@@ -1,12 +1,51 @@
 <p align="center"><img src="assets/logo.png" width="96" alt="MixDeck logo"></p>
 
-# MixDeck
+<h1 align="center">MixDeck</h1>
 
-An audio mixer for Windows 10/11: every app in its own channel, every channel with its own volume on every output (e.g. headphones and speakers). No audio driver to install.
+<p align="center">
+  <b>Per-app audio mixer for Windows.</b><br>
+  Every app in its own channel, every channel with its own volume on every output — headphones, speakers, a stream.<br>
+  No virtual audio driver to install.
+</p>
+
+<p align="center">
+  <a href="https://github.com/hpixsel/MixDeck/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/hpixsel/MixDeck?color=2DD4BF&label=release"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/hpixsel/MixDeck?color=2DD4BF"></a>
+  <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2DD4BF">
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-2DD4BF">
+</p>
+
+<p align="center">
+  <a href="https://github.com/hpixsel/MixDeck/releases/latest/download/MixDeck-win-Setup.exe"><b>⬇ Download MixDeck for Windows</b></a>
+</p>
+
+<p align="center"><img src="docs/screenshots/main.png" alt="MixDeck main window: channels as rows, outputs as columns, live meters, auto-ducking badges" width="900"></p>
+
+## Highlights
+
+- **Channels × outputs.** Group apps into channels (Music, Chat, Games…) and set each channel's volume separately on each output: quieter music in the headphones, no chat on the speakers.
+- **Drag and drop.** Apps appear as chips with their icons; drag one onto another channel to move it. Click a chip for that app's own volume.
+- **Auto-ducking.** Music and the browser get quieter while someone talks on Chat, then smoothly come back.
+- **Sound for every output.** EQ, AutoEQ headphone correction and a hearing-protection limiter per output; noise suppression (RNNoise), noise gate and compressor for microphones.
+- **Stays out of the way.** Tray mini mixer, global hotkeys with an on-screen popup, profiles that switch on when a game starts, fallback devices when headphones are unplugged.
+- **Control it from anywhere.** Phone remote via QR code, a local HTTP/WebSocket API, Home Assistant and Stream Deck examples.
+- **Safe.** It restores your Windows default output on exit, and a watchdog does it even if MixDeck crashes. Updates install in one click.
+
+## Screenshots
+
+| Tray mini mixer | Phone remote |
+|:---:|:---:|
+| <img src="docs/screenshots/flyout.png" width="380" alt="Tray mini mixer"> | <img src="docs/screenshots/phone.png" width="260" alt="Phone remote"> |
+
+| Output sound: EQ, AutoEQ, limiter | Settings: auto-ducking and profiles |
+|:---:|:---:|
+| <img src="docs/screenshots/eq.png" alt="EQ and hearing protection dialog"> | <img src="docs/screenshots/settings.png" alt="Settings with auto-ducking and profiles"> |
+
+<p align="center"><img src="docs/screenshots/wizard.png" width="600" alt="First-run setup wizard"><br><sub>First-run setup wizard</sub></p>
 
 ## Install
 
-Run `MixDeck-win-Setup.exe` (from GitHub Releases or the local `releases` folder). It installs per user into `%LocalAppData%\MixDeck` without admin rights, adds a Start menu shortcut and installs .NET 10 if needed. On first start a setup wizard helps you pick your outputs and deal with conflicts such as Wave Link starting with Windows.
+Download **[MixDeck-win-Setup.exe](https://github.com/hpixsel/MixDeck/releases/latest/download/MixDeck-win-Setup.exe)** from the [latest release](https://github.com/hpixsel/MixDeck/releases/latest) and run it. It installs per user into `%LocalAppData%\MixDeck` without admin rights, adds a Start menu shortcut and installs .NET 10 if needed. On first start a setup wizard helps you pick your outputs and deal with conflicts such as Wave Link starting with Windows. New versions are offered inside the app (Settings → Updates).
 
 ## How it works
 
@@ -103,7 +142,7 @@ dotnet test tests\MixDeck.Tests          # DSP: filters, limiter, gate, clock-dr
 .\build\make-icon.ps1                     # regenerates assets\MixDeck.ico and logo.png
 ```
 
-**Updates:** enter the GitHub repository URL (or a folder with releases) in **Settings → Updates**. An installed copy checks for new versions and updates itself in one click.
+**Updates:** installed copies check https://github.com/hpixsel/MixDeck releases (Settings → Updates; a folder with releases works too) and update themselves in one click.
 
 **Command line:**
 - `MixDeck.exe --minimized` starts in the tray,

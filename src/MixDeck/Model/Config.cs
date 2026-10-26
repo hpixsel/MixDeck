@@ -151,7 +151,7 @@ public sealed class AppConfig
     public bool LowLatency { get; set; }
     public RemoteConfig Remote { get; set; } = new();
     /// <summary>Where new versions come from: a GitHub repository URL (Releases) or a folder. Empty = no update checks.</summary>
-    public string? UpdateSource { get; set; }
+    public string? UpdateSource { get; set; } = "https://github.com/hpixsel/MixDeck";
 }
 
 /// <summary>Local HTTP/WebSocket API and the phone remote page.</summary>

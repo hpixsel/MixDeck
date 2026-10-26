@@ -52,7 +52,8 @@ public partial class LevelSlider : UserControl
         double w = Track.ActualWidth;
         double fill = Math.Clamp(Value / 100, 0, 1);
         Fill.Width = w * fill;
-        Meter.Width = IsMuted ? 0 : w * Math.Clamp(Level, 0, 1);
+        // The meter is on a dB scale and the slider is linear; never let the signal look louder than the setting
+        Meter.Width = IsMuted ? 0 : Math.Min(w * Math.Clamp(Level, 0, 1), Fill.Width);
         Opacity = IsMuted ? 0.4 : 1;
     }
 }
