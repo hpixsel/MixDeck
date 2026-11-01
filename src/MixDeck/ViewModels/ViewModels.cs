@@ -352,8 +352,9 @@ public partial class MainViewModel : ObservableObject
         service.StatusChanged += s => _dispatcher.BeginInvoke(() => ApplyStatus(s));
         service.OutputsChanged += () => _dispatcher.BeginInvoke(UpdateOutputNotes);
 
+        // Started only while a window shows meters (see SetMetersActive); idle in the tray costs nothing
         _meterTimer = new(TimeSpan.FromMilliseconds(33), System.Windows.Threading.DispatcherPriority.Render, (_, _) => UpdateMeters(), dispatcher);
-        _meterTimer.Start();
+        _meterTimer.Stop();
         InitFeatures();
     }
 
@@ -370,6 +371,18 @@ public partial class MainViewModel : ObservableObject
         foreach (var mix in Mixes) vm.Sends.Add(new SendViewModel(this, vm, mix, c.Send(mix.Id)));
         Channels.Add(vm);
         UpdateChannelHints();
+    }
+
+    public void SetMetersActive(bool active)
+    {
+        if (active) _meterTimer.Start();
+        else _meterTimer.Stop();
+    }
+
+    /// <summary>Refreshes meters now if no window is driving them (e.g. for the phone remote).</summary>
+    public void UpdateMetersIfIdle()
+    {
+        if (!_meterTimer.IsEnabled) UpdateMeters();
     }
 
     void UpdateMeters()

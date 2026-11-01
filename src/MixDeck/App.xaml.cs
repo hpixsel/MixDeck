@@ -91,6 +91,10 @@ public partial class App : Application
         _window = new MainWindow(this) { DataContext = _vm };
         _flyout = new TrayFlyout(ShowWindow) { DataContext = _vm };
         _tray = new TrayIcon(() => _flyout.Toggle(), ShowWindow, ExitApp);
+        // Meters animate only while something shows them
+        void MetersVisibility(object? s, DependencyPropertyChangedEventArgs a) => _vm.SetMetersActive(_window.IsVisible || _flyout.IsVisible);
+        _window.IsVisibleChanged += MetersVisibility;
+        _flyout.IsVisibleChanged += MetersVisibility;
 
         _osd = new Osd();
         _vm.OsdRequested += (glyph, accent, title, detail, level) => _osd.Show(glyph, accent, title, detail, level);
@@ -144,7 +148,8 @@ public partial class App : Application
 
     public void ShowWindow()
     {
-        if (_window == null) return;
+        // A show request can arrive while exiting (e.g. a second launch right after --quit); the window is gone then
+        if (_window == null || _exiting) return;
         _window.Show();
         if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
         _window.Activate();

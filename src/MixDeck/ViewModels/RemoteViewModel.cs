@@ -129,7 +129,15 @@ public partial class MainViewModel : IRemoteBridge
         profiles = Profiles.Select(p => new { p.Id, p.Name, active = p.IsActive }),
     };
 
-    public object Levels() => new
+    public object Levels() => LevelsNow();
+
+    object LevelsNow()
+    {
+        UpdateMetersIfIdle();
+        return LevelsSnapshot();
+    }
+
+    object LevelsSnapshot() => new
     {
         sends = Channels.SelectMany(c => c.Sends.Select(s => new { k = $"{c.Id}|{s.Mix.Id}", v = Math.Round(s.Level, 3) })).ToDictionary(x => x.k, x => x.v),
         mixes = Mixes.ToDictionary(m => m.Id, m => Math.Round(m.Level, 3)),

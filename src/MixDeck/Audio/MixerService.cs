@@ -485,42 +485,128 @@ public sealed class MixerService : IDisposable
 
     void PollLoop()
     {
+        bool debug = Debug;
+        long pollCpu = 0, waitCpu = 0, iterations = 0, wakes = 0, lastReport = Environment.TickCount64;
+        long lastCollect = Environment.TickCount64;
         while (!_stopping)
         {
+            // Every poll wraps fresh COM objects (devices, sessions) whose native handles are only released when
+            // the GC finalizes them. MixDeck allocates so little that a full GC rarely happens on its own, so the
+            // handle count would climb for a long time; a background collection once a minute keeps it flat.
+            if (Environment.TickCount64 - lastCollect > 60_000)
+            {
+                GC.Collect(2, GCCollectionMode.Forced, blocking: false);
+                lastCollect = Environment.TickCount64;
+            }
+            long t0 = debug ? ThreadCpuMs() : 0;
             try { Poll(); }
             catch (Exception ex) { Log.Write($"Poll failed: {ex}"); }
-            _wake.WaitOne(PollIntervalMs);
+            long t1 = debug ? ThreadCpuMs() : 0;
+            if (_wake.WaitOne(PollIntervalMs)) wakes++;
+            if (!debug) continue;
+            long t2 = ThreadCpuMs();
+            pollCpu += t1 - t0;
+            waitCpu += t2 - t1;
+            iterations++;
+            if (Environment.TickCount64 - lastReport > 10_000)
+            {
+                using var self = Process.GetCurrentProcess();
+                Log.Write($"[dbg] poll: {iterations} runs, {wakes} wakes, CPU in Poll {pollCpu} ms, in wait {waitCpu} ms, handles {self.HandleCount}");
+                pollCpu = waitCpu = iterations = wakes = 0;
+                lastReport = Environment.TickCount64;
+            }
         }
+    }
+
+    /// <summary>CPU time (user + kernel) of the calling thread, for diagnostics.</summary>
+    static long ThreadCpuMs()
+    {
+        GetThreadTimes(GetCurrentThread(), out _, out _, out long kernel, out long user);
+        return (kernel + user) / 10_000;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GetCurrentThread();
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool GetThreadTimes(IntPtr thread, out long creation, out long exit, out long kernel, out long user);
+
+    // Reading an endpoint's friendly name costs ~40-50 ms of CPU (NAudio walks the whole property store),
+    // so names are read once per device id instead of on every poll.
+    readonly Dictionary<string, string> _names = [];
+
+    string NameOf(MMDevice d)
+    {
+        if (!_names.TryGetValue(d.ID, out var name))
+        {
+            try { name = d.FriendlyName; } catch { name = d.ID; }
+            _names[d.ID] = name;
+        }
+        return name;
+    }
+
+    /// <summary>Id of the current default output, releasing the COM object right away.</summary>
+    static string? DefaultId(MMDeviceEnumerator en, Role role)
+    {
+        try
+        {
+            using var d = en.GetDefaultAudioEndpoint(DataFlow.Render, role);
+            return d.ID;
+        }
+        catch { return null; }
+    }
+
+    static readonly bool Debug = Environment.GetEnvironmentVariable("MIXDECK_DEBUG") == "1";
+    readonly Dictionary<string, long> _stageCpu = [];
+
+    /// <summary>Diagnostics (MIXDECK_DEBUG=1): CPU time per Poll() stage.</summary>
+    void Stage(string name, ref long mark)
+    {
+        if (!Debug) return;
+        long now = ThreadCpuMs();
+        _stageCpu[name] = _stageCpu.GetValueOrDefault(name) + now - mark;
+        mark = now;
     }
 
     void Poll()
     {
+        long mark = Debug ? ThreadCpuMs() : 0;
         using var en = new MMDeviceEnumerator();
         var renders = en.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active).ToList();
         var captures = en.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active).ToList();
+        Stage("enumerate", ref mark);
         try
         {
             var collector = renders.FirstOrDefault(d => d.ID == _cfg.CollectorDevice)
-                ?? renders.FirstOrDefault(d => d.FriendlyName.Contains(_cfg.CollectorDevice, StringComparison.OrdinalIgnoreCase));
+                ?? renders.FirstOrDefault(d => NameOf(d).Contains(_cfg.CollectorDevice, StringComparison.OrdinalIgnoreCase));
             CollectorId = collector?.ID;
             UpdateDeviceLists(renders, captures);
+            Stage("device-lists", ref mark);
 
             lock (_gate)
             {
                 if (!_defaultApplied && collector != null) ApplyDefault(en, collector);
                 else if (collector != null) GuardDefault(en, collector);
             }
+            Stage("guard-default", ref mark);
 
             ScanSessions(renders, collector);
+            Stage("sessions", ref mark);
 
             lock (_gate)
             {
                 if (_stopping) return;
                 UpdateOutputs(en, renders);
+                Stage("outputs", ref mark);
                 EnsureInputs(en);
+                Stage("inputs", ref mark);
             }
 
             UpdateStatus(en, collector);
+            Stage("status", ref mark);
+            if (Debug && _stageCpu.Values.Sum() > 2000)
+            {
+                Log.Write("[dbg] stages ms: " + string.Join(", ", _stageCpu.Select(kv => $"{kv.Key}={kv.Value}")));
+                _stageCpu.Clear();
+            }
         }
         finally
         {
@@ -541,7 +627,7 @@ public sealed class MixerService : IDisposable
                 .FirstOrDefault(id => id != null && id != CollectorId && active.Contains(id));
             if (desired != mo.DeviceId)
             {
-                Log.Write($"Mix {m.Name}: using {renders.FirstOrDefault(d => d.ID == desired)?.FriendlyName ?? "(no device)"}");
+                Log.Write($"Mix {m.Name}: using {(renders.FirstOrDefault(d => d.ID == desired) is { } dd ? NameOf(dd) : "(no device)")}");
                 mo.SetDevice(desired);
                 changed = true;
             }
@@ -554,8 +640,11 @@ public sealed class MixerService : IDisposable
 
     void UpdateDeviceLists(List<MMDevice> renders, List<MMDevice> captures)
     {
-        var r = renders.Select(d => new DeviceInfo(d.ID, d.FriendlyName)).OrderBy(d => d.Name).ToList();
-        var c = captures.Select(d => new DeviceInfo(d.ID, d.FriendlyName)).OrderBy(d => d.Name).ToList();
+        // Forget names of devices that went away, so a re-plugged device gets its name read again
+        var present = renders.Concat(captures).Select(d => d.ID).ToHashSet();
+        foreach (var gone in _names.Keys.Where(id => !present.Contains(id)).ToList()) _names.Remove(gone);
+        var r = renders.Select(d => new DeviceInfo(d.ID, NameOf(d))).OrderBy(d => d.Name).ToList();
+        var c = captures.Select(d => new DeviceInfo(d.ID, NameOf(d))).OrderBy(d => d.Name).ToList();
         var sig = string.Join("|", r.Select(d => d.Id)) + "#" + string.Join("|", c.Select(d => d.Id)) + "#" + CollectorId;
         if (sig == _deviceSignature) return;
         _deviceSignature = sig;
@@ -593,7 +682,7 @@ public sealed class MixerService : IDisposable
                 var sessions = mgr.Sessions;
                 for (int i = 0; i < sessions.Count; i++)
                 {
-                    var s = sessions[i];
+                    using var s = sessions[i];
                     int pid = (int)s.GetProcessID;
                     var state = s.State;
                     if (pid == 0 || pid == _selfPid || state == AudioSessionState.AudioSessionStateExpired) continue;
@@ -612,7 +701,7 @@ public sealed class MixerService : IDisposable
                     }
                     else if (playing)
                     {
-                        bypass[proc.Exe] = dev.FriendlyName;
+                        bypass[proc.Exe] = NameOf(dev);
                         if (!bypassPids.TryGetValue(proc.Exe, out var list)) bypassPids[proc.Exe] = list = [];
                         list.Add(pid);
                     }
@@ -620,7 +709,7 @@ public sealed class MixerService : IDisposable
             }
             catch (Exception ex)
             {
-                Log.Write($"Sessions on {dev.FriendlyName}: {ex.Message}");
+                Log.Write($"Sessions on {NameOf(dev)}: {ex.Message}");
             }
         }
 
@@ -776,7 +865,7 @@ public sealed class MixerService : IDisposable
         else
         {
             string? def = null;
-            try { def = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia).ID; } catch { }
+            def = DefaultId(en, Role.Multimedia);
             List<string> missing, fallback;
             int apps;
             lock (_gate)
@@ -808,7 +897,7 @@ public sealed class MixerService : IDisposable
         _defaultApplied = true;
         if (!_cfg.ManageDefaultDevice) return;
         string? current = null;
-        try { current = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia).ID; } catch { }
+        current = DefaultId(en, Role.Multimedia);
         if (current == collector.ID) return;
         // Keep the first remembered device: after a crash the current default may be a stray one
         _cfg.RestoreDefaultId ??= current;
@@ -816,7 +905,7 @@ public sealed class MixerService : IDisposable
         try
         {
             DefaultDevice.Set(collector.ID);
-            Log.Write($"Default device set to collector {collector.FriendlyName} (was {current})");
+            Log.Write($"Default device set to collector {NameOf(collector)} (was {current})");
         }
         catch (Exception ex)
         {
@@ -830,8 +919,7 @@ public sealed class MixerService : IDisposable
         bool ours = true;
         foreach (var role in new[] { Role.Multimedia, Role.Communications })
         {
-            try { ours &= en.GetDefaultAudioEndpoint(DataFlow.Render, role).ID == collector.ID; }
-            catch { ours = false; }
+            ours &= DefaultId(en, role) == collector.ID;
         }
         if (ours) return;
         try

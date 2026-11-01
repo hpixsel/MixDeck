@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2
+
+- **Idle CPU down from ~25% of a core to under 2%.** The device poll read every endpoint's friendly name each 1.5 s; NAudio walks the whole property store for that (~40–50 ms per device), about 500 ms of CPU per poll. Names are now cached per device id.
+- Handle count stays flat instead of climbing into the thousands: the COM objects created by each poll are released promptly.
+- Level meters only animate while the window or the tray mixer is visible.
+- RAM in the tray: ~180 MB instead of ~280 MB.
+- Fixed a rare error when a second launch arrived while MixDeck was closing.
+- `MIXDECK_DEBUG=1` now also logs CPU time per poll stage.
+
 ## 0.3.1
 
 - Level meters never extend past the slider's volume setting (the meter uses a dB scale, the slider a linear one).
