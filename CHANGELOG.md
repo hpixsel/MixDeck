@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- **Games launched from Steam (or any other app MixDeck already captures) had no sound.** A process was skipped when one of its ancestors was being captured, assuming the ancestor's loopback tree covers it; it doesn't for processes started later. Now only helper processes of the same app are skipped (e.g. browser tabs), so a game gets its own capture and its own channel.
+
 ## 0.3.2
 
 - **Idle CPU down from ~25% of a core to under 2%.** The device poll read every endpoint's friendly name each 1.5 s; NAudio walks the whole property store for that (~40–50 ms per device), about 500 ms of CPU per poll. Names are now cached per device id.

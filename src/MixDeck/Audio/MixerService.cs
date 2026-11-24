@@ -777,7 +777,9 @@ public sealed class MixerService : IDisposable
         {
             cur = e.ParentPid;
             if (cur == 0 || cur == pid) return false;
-            if (captured.ContainsKey(cur)) return true;
+            // Only the same app's helper processes are covered (browser tabs); a game launched by a captured
+            // Steam is not part of Steam's loopback tree and must get its own capture
+            if (captured.ContainsKey(cur) && table.TryGetValue(cur, out var anc) && anc.Exe == table[pid].Exe) return true;
         }
         return false;
     }
